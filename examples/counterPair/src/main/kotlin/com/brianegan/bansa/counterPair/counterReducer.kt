@@ -1,8 +1,9 @@
 package com.brianegan.bansa.counterPair
 
+import com.brianegan.bansa.createReducer
 import java.util.*
 
-val counterReducer = { state: ApplicationState, action: CounterAction ->
+val counterReducer = createReducer { state: ApplicationState, action: CounterAction ->
     when (action) {
         is INIT -> action.initialState
         is INCREMENT -> {

@@ -1,8 +1,8 @@
 package com.brianegan.bansa
 
-fun <S : State, A : Action> applyMiddleware(
-        vararg middleware: (Store<S, A>) -> ((A) -> A) -> (A) -> A)
-        : (Store<S, A>) -> Store<S, A> {
+fun <S : State> applyMiddleware(
+        vararg middleware: (Store<S>) -> ((Action) -> Action) -> (Action) -> Action)
+        : (Store<S>) -> Store<S> {
     return { store ->
         store.dispatch = compose(middleware.map { it(store) })(store.dispatch)
         store

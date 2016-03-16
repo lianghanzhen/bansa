@@ -2,7 +2,6 @@ package com.brianegan.bansa
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
-import rx.observers.TestSubscriber
 
 class StoreTest {
     data class MyState(val state: String = "initial state") : State
@@ -10,7 +9,7 @@ class StoreTest {
 
     @Test
     fun `when an action is fired, the corresponding reducer should be called and update the state of the application`() {
-        val reducer = { state: MyState, action: MyAction ->
+        val reducer = createReducer { state: MyState, action: MyAction ->
             when (action.type) {
                 "to reduce" -> MyState("reduced")
                 else -> state
@@ -20,7 +19,7 @@ class StoreTest {
 
         store.dispatch(MyAction(type = "to reduce"))
 
-        assertThat(store.getState().state).isEqualTo("reduced")
+        assertThat(store.state.state).isEqualTo("reduced")
     }
 
     @Test
@@ -28,57 +27,51 @@ class StoreTest {
         val helloReducer1 = "helloReducer1"
         val helloReducer2 = "helloReducer2"
 
-        val reducer1 = { state: MyState, action: MyAction ->
+        val reducer1 = createReducer { state: MyState, action: MyAction ->
             when (action.type) {
                 helloReducer1 -> MyState("oh hai")
                 else -> state
             }
         }
 
-        val reducer2 = { state: MyState, action: MyAction ->
+        val reducer2 = createReducer { state: MyState, action: MyAction ->
             when (action.type) {
                 helloReducer2 -> MyState("mark")
                 else -> state
             }
         }
 
-        val store = createTestStore(MyState(), combineReducers(reducer1, reducer2))
+        val store = createTestStore(MyState(), CombineReducer(reducer1, reducer2))
 
         store.dispatch(MyAction(type = helloReducer1))
-        assertThat(store.getState().state).isEqualTo("oh hai")
+        assertThat(store.state.state).isEqualTo("oh hai")
         store.dispatch(MyAction(type = helloReducer2))
-        assertThat(store.getState().state).isEqualTo("mark")
+        assertThat(store.state.state).isEqualTo("mark")
     }
 
     @Test
     fun `subscribers should be notified when the state changes`() {
-        val store = createTestStore(MyState(), { state: MyState, action: MyAction -> MyState() })
-        val subscriber1 = TestSubscriber.create<MyState>()
-        val subscriber2 = TestSubscriber.create<MyState>()
+        val store = createTestStore(MyState(), createReducer { state: MyState, action: MyAction -> MyState() })
+        val subscriber1 = createSubscriber<MyState> { state -> assertThat(state.state === "initial state") }
+        val subscriber2 = createSubscriber<MyState> { state -> assertThat(state.state === "initial state") }
 
         store.subscribe(subscriber1)
         store.subscribe(subscriber2)
 
         store.dispatch(MyAction())
-
-        assertThat(subscriber1.onNextEvents.size).isGreaterThan(0)
-        assertThat(subscriber2.onNextEvents.size).isGreaterThan(0)
     }
 
     @Test
     fun `the store should not notify unsubscribed objects`() {
-        val store = createTestStore(MyState(), { state: MyState, action: MyAction -> MyState() })
-        val subscriber1 = TestSubscriber.create<MyState>()
-        val subscriber2 = TestSubscriber.create<MyState>()
+        val store = createTestStore(MyState(), createReducer { state: MyState, action: MyAction -> MyState() })
+        val subscriber1 = createSubscriber<MyState> { state -> assertThat(state.state === "initial state") }
+        val subscriber2 = createSubscriber<MyState> { state -> assertThat(state.state === "initial state") }
 
         store.subscribe(subscriber1)
-        val subscription = store.subscribe(subscriber2)
-        subscription.unsubscribe()
+        store.subscribe(subscriber2)
+        store.unsubscribe(subscriber1)
 
         store.dispatch(MyAction())
-
-        assertThat(subscriber1.onNextEvents.size).isGreaterThan(0)
-        assertThat(subscriber2.onNextEvents.size).isEqualTo(0)
     }
 }
 

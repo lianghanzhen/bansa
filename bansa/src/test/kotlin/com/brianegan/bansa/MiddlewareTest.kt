@@ -13,9 +13,9 @@ class MiddlewareTest {
     @Test
     fun `actions should be run through a store's middleware`() {
         var counter = 0
-        val middleWare = { store: Store<MyState, MyAction> ->
-            { next: (MyAction) -> MyAction ->
-                { action: MyAction ->
+        val middleWare = { store: Store<MyState> ->
+            { next: (Action) -> Action ->
+                { action: Action ->
                     counter += 1
                     next(action)
                     action
@@ -23,15 +23,15 @@ class MiddlewareTest {
             }
         }
 
-        val reducer = { state: MyState, action: MyAction ->
+        val reducer = createReducer { state: MyState, action: MyAction ->
             state
         }
 
-        val store = applyMiddleware<MyState, MyAction>(middleWare)(createTestStore(MyState(), reducer))
+        val store = applyMiddleware(middleWare)(createTestStore(MyState(), reducer))
 
         store.dispatch(MyAction(type = "hey hey!"))
 
-        assertThat(store.getState()).isEqualTo(MyState())
+        assertThat(store.state).isEqualTo(MyState())
         assertThat(counter).isEqualTo(1)
     }
 
@@ -40,9 +40,9 @@ class MiddlewareTest {
         var counter = 0
         var order = ArrayList<String>()
 
-        val middleWare1 = { store: Store<MyState, MyAction> ->
-            { next: (MyAction) -> MyAction ->
-                { action: MyAction ->
+        val middleWare1 = { store: Store<MyState> ->
+            { next: (Action) -> Action ->
+                { action: Action ->
                     counter += 1
                     order.add("first")
                     val nextAction = next(action)
@@ -52,9 +52,9 @@ class MiddlewareTest {
             }
         }
 
-        val middleWare2 = { store: Store<MyState, MyAction> ->
-            { next: (MyAction) -> MyAction ->
-                { action: MyAction ->
+        val middleWare2 = { store: Store<MyState> ->
+            { next: (Action) -> Action ->
+                { action: Action ->
                     counter += 1
                     order.add("second")
                     val nextAction = next(action)
@@ -63,18 +63,18 @@ class MiddlewareTest {
             }
         }
 
-        val reducer = { state: MyState, action: MyAction ->
+        val reducer = createReducer { state: MyState, action: MyAction ->
             when (action.type) {
                 "hey hey!" -> MyState(state = "howdy!")
                 else -> state
             }
         }
 
-        val store = applyMiddleware<MyState, MyAction>(middleWare1, middleWare2)(createTestStore(MyState(), reducer))
+        val store = applyMiddleware(middleWare1, middleWare2)(createTestStore(MyState(), reducer))
 
         store.dispatch(MyAction(type = "hey hey!"))
 
-        assertThat(store.getState()).isEqualTo(MyState("howdy!"))
+        assertThat(store.state).isEqualTo(MyState("howdy!"))
         assertThat(counter).isEqualTo(2)
         assertThat(order).isEqualTo(arrayListOf("first", "second", "third"))
     }
@@ -85,39 +85,45 @@ class MiddlewareTest {
         var order = ArrayList<String>()
         val testScheduler = rx.schedulers.TestScheduler()
 
-        val fetchMiddleware = { store: Store<MyState, MyAction> ->
-            { next: (MyAction) -> MyAction ->
-                { action: MyAction ->
+        val fetchMiddleware = { store: Store<MyState> ->
+            { next: (Action) -> Action ->
+                { action: Action ->
                     counter += 1
-                    when (action.type) {
-                        "CALL_API" -> {
-                            next(MyAction("FETCHING"))
-                            Observable
-                                    .just(5)
-                                    .delay(1L, TimeUnit.SECONDS, testScheduler)
-                                    .subscribe({
-                                        next(MyAction("FETCH_COMPLETE"))
-                                    })
+                    if (action !is MyAction) {
+                        next(action)
+                    } else {
+                        when (action.type) {
+                            "CALL_API" -> {
+                                next(MyAction("FETCHING"))
+                                Observable
+                                        .just(5)
+                                        .delay(1L, TimeUnit.SECONDS, testScheduler)
+                                        .subscribe({
+                                            next(MyAction("FETCH_COMPLETE"))
+                                        })
 
-                            next(action)
+                                next(action)
+                            }
+                            else -> next(action)
                         }
-                        else -> next(action)
                     }
                 }
             }
         }
 
-        val loggerMiddleware = { store: Store<MyState, MyAction> ->
-            { next: (MyAction) -> MyAction ->
-                { action: MyAction ->
+        val loggerMiddleware = { store: Store<MyState> ->
+            { next: (Action) -> Action ->
+                { action: Action ->
                     counter += 1
-                    order.add(action.type)
+                    if (action is MyAction) {
+                        order.add(action.type)
+                    }
                     next(action)
                 }
             }
         }
 
-        val reducer = { state: MyState, action: MyAction ->
+        val reducer = createReducer { state: MyState, action: MyAction ->
             when (action.type) {
                 "FETCHING" -> MyState(state = "FETCHING")
                 "FETCH_COMPLETE" -> MyState(state = "FETCH_COMPLETE")
@@ -125,18 +131,18 @@ class MiddlewareTest {
             }
         }
 
-        val store = applyMiddleware<MyState, MyAction>(fetchMiddleware, loggerMiddleware)(createTestStore(MyState(), reducer))
+        val store = applyMiddleware(fetchMiddleware, loggerMiddleware)(createTestStore(MyState(), reducer))
 
         store.dispatch(MyAction(type = "CALL_API"))
 
         assertThat(counter).isEqualTo(3)
         assertThat(order).isEqualTo(arrayListOf("FETCHING", "CALL_API"))
-        assertThat(store.getState()).isEqualTo(MyState("FETCHING"))
+        assertThat(store.state).isEqualTo(MyState("FETCHING"))
 
         testScheduler.advanceTimeBy(2L, TimeUnit.SECONDS)
         assertThat(counter).isEqualTo(4)
         assertThat(order).isEqualTo(arrayListOf("FETCHING", "CALL_API", "FETCH_COMPLETE"))
-        assertThat(store.getState()).isEqualTo(MyState(state = "FETCH_COMPLETE"))
+        assertThat(store.state).isEqualTo(MyState(state = "FETCH_COMPLETE"))
     }
 
     @Test
@@ -144,9 +150,9 @@ class MiddlewareTest {
         var counter = 0
         val order = ArrayList<String>()
 
-        val middleWare1 = { store: Store<MyState, MyAction> ->
-            { next: (MyAction) -> MyAction ->
-                { action: MyAction ->
+        val middleWare1 = { store: Store<MyState> ->
+            { next: (Action) -> Action ->
+                { action: Action ->
                     counter += 1
                     order.add("first")
 
@@ -154,7 +160,7 @@ class MiddlewareTest {
 
                     // Redispatch an action that goes through the whole chain
                     // (useful for async middleware)
-                    if (action.type == "around!") {
+                    if (action is MyAction && action.type == "around!") {
                         store.dispatch(MyAction());
                     }
 
@@ -163,9 +169,9 @@ class MiddlewareTest {
             }
         }
 
-        val middleWare2 = { store: Store<MyState, MyAction> ->
-            { next: (MyAction) -> MyAction ->
-                { action: MyAction ->
+        val middleWare2 = { store: Store<MyState> ->
+            { next: (Action) -> Action ->
+                { action: Action ->
                     counter += 1
                     order.add("second")
                     next(action)
@@ -173,11 +179,11 @@ class MiddlewareTest {
             }
         }
 
-        val reducer = { state: MyState, action: MyAction ->
+        val reducer = createReducer { state: MyState, action: MyAction ->
             state
         }
 
-        val store = applyMiddleware<MyState, MyAction>(middleWare1, middleWare2)(createTestStore(MyState(), reducer))
+        val store = applyMiddleware(middleWare1, middleWare2)(createTestStore(MyState(), reducer))
 
         store.dispatch(MyAction(type = "around!"))
 

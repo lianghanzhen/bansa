@@ -1,8 +1,9 @@
 package com.brianegan.bansa.counter
 
 import com.brianegan.bansa.Action
+import com.brianegan.bansa.createReducer
 
-val counterReducer = { state: ApplicationState, action: Action ->
+val counterReducer = createReducer { state: ApplicationState, action: Action ->
     when (action) {
         is CounterActions.INIT -> state
         is CounterActions.INCREMENT -> state.copy(counter = state.counter.plus(1))

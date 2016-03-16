@@ -8,7 +8,7 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
 open class RootActivity : AppCompatActivity() {
-    val store: Store<ApplicationState, Action> = Injekt.get<Store<ApplicationState, Action>>()
+    val store: Store<ApplicationState> = Injekt.get<Store<ApplicationState>>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

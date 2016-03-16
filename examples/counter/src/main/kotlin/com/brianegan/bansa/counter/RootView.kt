@@ -3,17 +3,13 @@ package com.brianegan.bansa.counter
 import android.content.Context
 import android.view.View
 import android.widget.LinearLayout
-import com.brianegan.bansa.Action
 import com.brianegan.bansa.Store
-import rx.Subscription
-import rx.android.schedulers.AndroidSchedulers
-import rx.functions.Action1
-import rx.subscriptions.Subscriptions
+import com.brianegan.bansa.createSubscriber
 import trikita.anvil.Anvil
 import trikita.anvil.DSL.*
 import trikita.anvil.RenderableView
 
-class RootView(c: Context, val store: Store<ApplicationState, Action>) : RenderableView(c) {
+class RootView(c: Context, val store: Store<ApplicationState>) : RenderableView(c) {
     override fun view() {
         template(buildPresentationModel())
     }
@@ -27,7 +23,7 @@ class RootView(c: Context, val store: Store<ApplicationState, Action>) : Rendera
     }
 
     private fun buildPresentationModel(): ViewModel {
-        val counter = store.getState().counter
+        val counter = store.state.counter
 
         return ViewModel(counter, increment, decrement)
     }
@@ -59,19 +55,18 @@ class RootView(c: Context, val store: Store<ApplicationState, Action>) : Rendera
         }
     }
 
-    var subscription: Subscription = Subscriptions.empty()
+    val subscriber = createSubscriber { state: ApplicationState -> Anvil.render()  }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
 
-        subscription = store.state.observeOn(AndroidSchedulers.mainThread()).subscribe(Action1 {
-            Anvil.render()
-        })
+        store.subscribe(subscriber)
     }
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
-        subscription.unsubscribe()
+
+        store.unsubscribe(subscriber)
     }
 
     data class ViewModel(val counter: Int, val increment: OnClickListener, val decrement: OnClickListener)
